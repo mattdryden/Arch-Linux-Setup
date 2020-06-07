@@ -1,0 +1,65 @@
+PRIMARY_DISK="$1";
+USER="matt"
+PASS="matt"
+HOSTNAME="Odyssey"
+SOFTWARE_ADD="grub efibootmgr"
+
+function setLocales {
+  echo "Setting locale"
+  sed -i -e 's/#en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/g' /etc/locale.gen
+  #sed -i -e 's/#en_GB.ISO-8859-1/en_GB.ISO-8859-1/g' /etc/locale.gen
+  locale-gen
+  echo -e "LANG=en_GB.UTF-8" > /etc/locale.conf
+  echo -e "KEYMAP=uk" > /etc/vconsole.conf
+}
+
+function setTimezone {
+  echo "Setting local timezone..."
+  rm -rf /etc/localtime
+  ln -s /usr/share/zoneinfo/Europe/London /etc/localtime
+  hwclock --systohc --utc
+}
+
+
+function createUser {
+  echo "Creating new user..."
+  useradd -m -G wheel,storage,power -s /bin/bash $USER
+  echo "${USER}:${PASS}" | chpasswd
+}
+
+function setHostname {
+  echo "Setting new hostname..."
+  echo $HOSTNAME >> etc/hostname
+  sed -i '/::1/a 127.0.1.1       ${HOSTNAME}.localdomain     ${HOSTNAME}' /etc/hosts
+}
+
+function installSoftware {
+  echo "Installing software..."
+  pacman -S $SOFTWARE_ADD --noconfirm
+}
+
+function mkinit {
+  echo "mkinitcpio"
+  mkinitcpio -P
+}
+
+function installGrub {
+  echo "Installing grub..."
+  grub-install --target=x86_64-efi --efi-directory=efi --bootloader-id=GRUB
+  grub-mkconfig -o /boot/grub/grub.cfg
+}
+
+function setEnviron {
+    echo "Setting environment variables..."
+    echo -e "EDITOR=nano" > /etc/environment
+    echo -e "${user} ALL=(ALL) ALL" >> /etc/sudoers
+}
+
+setLocales
+setTimezone
+setHostname
+createUser
+setEnviron
+installSoftware
+mkinit
+installGrub

@@ -1,0 +1,62 @@
+#!/bin/bash
+
+PRIMARY_DISK="/dev/sdb";
+BASE="base base-devel btrfs-progs linux-firmware"
+
+function partitionDisk {
+  echo "Partitioning disk $PRIMARY_DISK..."
+  echo "Create 1st partition 512MB /efi. 2nd for the rest."
+  #fdisk $PRIMARY_DISK
+  parted -s "${PRIMARY_DISK}" mklabel gpt
+  parted -s -a optimal "${PRIMARY_DISK}" mkpart primary fat32 0% 512M
+  parted -s -a optimal "${PRIMARY_DISK}" mkpart primary btrfs 512M 100%
+  echo "Formatting boot disk..."
+  mkfs.fat -F32 ${PRIMARY_DISK}1
+  echo "Formtting encrypted partition as BTRFS"
+  mkfs.btrfs -f ${PRIMARY_DISK}2
+}
+
+function createSubvols {
+  echo "Creating subvolumes to install..."
+  mount ${PRIMARY_DISK}1 /mnt
+  cd /mnt
+  btrfs sub create @root
+  btrfs sub create @home
+  cd /
+  umount /mnt
+}
+
+function mountSubvols {
+  echo "Mounting subvolumes for install..."
+  mount ${PRIMARY_DISK}1 -o subvol=@root
+  mkdir /mnt/boot
+  mkdir /mnt/home
+  mount ${PRIMARY_DISK}1 -o subvol=@home /mnt/home
+  mount ${PRIMARY_DISK}1 /mnt/efi
+}
+
+function setupWifi {
+  echo "Connecting to wifi..."
+  wifi-menu
+  systemctl dhcpcd disable
+}
+
+function installBootstrap {
+  "Pacstrapping system..."
+  pacman -Syy
+  pacstrap /mnt $BASE
+}
+
+function enterChroot {
+  echo "Chrooting into install..."
+  genfstab -p /mnt >> /mnt/etc/fstab
+  # cp -a /root/installer/chroot.sh /mnt/root/chroot.sh
+  arch-chroot /mnt sh /root/chroot "$PRIMARY_DISK"
+}
+
+# setupWifi
+partitionDisk
+createSubvols
+mountSubvols
+installBootstrap
+enterChroot
