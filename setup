@@ -56,10 +56,10 @@ function enterChroot {
 
 function makeFreshSnapshot {
   echo "Making snapshot of fresh installation..."
-  mount $PRIMARY_DISK /mnt
+  mount ${PRIMARY_DISK}2 /mnt
   cd /mnt
-  btrfs subvol snap -R @root @root_initial
-  btrfs subvol snap -R @home @home_initial
+  btrfs subvol snap -r @root @root_initial
+  btrfs subvol snap -r @home @home_initial
   cd /
   umount /mnt
 }
