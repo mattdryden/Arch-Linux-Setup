@@ -52,7 +52,7 @@ function installGrub {
 function setEnviron {
     echo "Setting environment variables..."
     echo -e "EDITOR=nano" > /etc/environment
-    echo -e "${user} ALL=(ALL) ALL" >> /etc/sudoers
+    echo -e "$USER ALL=(ALL) ALL" >> /etc/sudoers
 }
 
 setLocales
