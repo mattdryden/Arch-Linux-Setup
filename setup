@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PRIMARY_DISK="/dev/sda";
-BASE="base base-devel linux linux-firmware btrfs-progs dhcpcd netctl dialog wpa_supplicant"
+BASE="base base-devel linux linux-firmware btrfs-progs dhcpcd netctl dialog wpa_supplicant intel-ucode grub efibootmgr"
 
 function partitionDisk {
   echo "Partitioning disk $PRIMARY_DISK..."
@@ -80,4 +80,4 @@ mountSubvols
 installBootstrap
 enterChroot
 makeFreshSnapshot
-unmountAndReboot
+# unmountAndReboot

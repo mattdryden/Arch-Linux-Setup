@@ -2,7 +2,7 @@ PRIMARY_DISK="$1";
 USER="matt"
 PASS="matt"
 HOSTNAME="Odyssey"
-SOFTWARE_ADD="grub efibootmgr"
+SOFTWARE_ADD=""
 
 function setLocales {
   echo "Setting locale"
@@ -55,11 +55,22 @@ function setEnviron {
     echo -e "$USER ALL=(ALL) ALL" >> /etc/sudoers
 }
 
+function installXorg {
+    echo "Installing xorg..."
+    pacman -Sy xf86-video-vesa xorg-server xorg-xinit xorg-xrandr
+}
+
+function installDesktop {
+    echo "Installing desktop..."
+    pacman -Sy dmenu sxhkd bspwm rxvt-unicode nano lightdm
+}
+
 setLocales
 setTimezone
 setHostname
 createUser
 setEnviron
 installSoftware
+installXorg
 mkinit
 installGrub
