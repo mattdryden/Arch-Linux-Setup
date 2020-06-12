@@ -1,7 +1,13 @@
 #!/bin/bash
 
+# Setup
 PRIMARY_DISK="/dev/sda";
-BASE="base base-devel linux linux-firmware btrfs-progs dhcpcd netctl dialog wpa_supplicant intel-ucode grub efibootmgr"
+BASE="base base-devel linux linux-firmware btrfs-progs dhcpcd netctl dialog wpa_supplicant intel-ucode grub efibootmgr git"
+
+# Chroot
+USER="matt"
+HOSTNAME="Odyssey"
+SOFTWARE_ADD=""
 
 function partitionDisk {
   echo "Partitioning disk $PRIMARY_DISK..."
@@ -50,18 +56,20 @@ function installBootstrap {
 function enterChroot {
   echo "Chrooting into install..."
   genfstab -p /mnt >> /mnt/etc/fstab
-  cp -a /root/chroot /mnt/root/chroot
-  arch-chroot /mnt sh /root/chroot "$PRIMARY_DISK"
+  # cp -a /root/chroot /mnt/root/chroot
+  cp "$0" /mnt/setup.sh
+  arch-chroot /mnt bash -c "./setup.sh chroot"
 }
 
 function makeFreshSnapshot {
   echo "Making snapshot of fresh installation..."
-  mount ${PRIMARY_DISK}2 /mnt
-  cd /mnt
+  mkdir /mnt/tmp
+  mount ${PRIMARY_DISK}2 /mnt/tmp
+  cd /mnt/tmp
   btrfs subvol snap -r @root @root_initial
   btrfs subvol snap -r @home @home_initial
   cd /
-  umount /mnt
+  umount /mnt/tmp
 }
 
 function unmountAndReboot {
@@ -73,11 +81,103 @@ function unmountAndReboot {
   reboot
 }
 
-# setupWifi
-partitionDisk
-createSubvols
-mountSubvols
-installBootstrap
-enterChroot
-makeFreshSnapshot
-# unmountAndReboot
+function setLocales {
+  echo "Setting locale"
+  sed -i -e 's/#en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/g' /etc/locale.gen
+  #sed -i -e 's/#en_GB.ISO-8859-1/en_GB.ISO-8859-1/g' /etc/locale.gen
+  locale-gen
+  echo -e "LANG=en_GB.UTF-8" > /etc/locale.conf
+  echo -e "KEYMAP=uk" > /etc/vconsole.conf
+}
+
+function setTimezone {
+  echo "Setting local timezone..."
+  rm -rf /etc/localtime
+  ln -s /usr/share/zoneinfo/Europe/London /etc/localtime
+  hwclock --systohc --utc
+}
+
+
+function createUser {
+  echo "Creating new user..."
+  useradd -m -G wheel,storage,power -s /bin/bash $USER
+  echo "${USER}:${PASS}" | chpasswd
+}
+
+function setHostname {
+  echo "Setting new hostname..."
+  echo $HOSTNAME >> etc/hostname
+  sed -i '/::1/a 127.0.1.1       ${HOSTNAME}.localdomain     ${HOSTNAME}' /etc/hosts
+}
+
+function installSoftware {
+  echo "Installing software..."
+  pacman -S $SOFTWARE_ADD --noconfirm
+}
+
+function mkinit {
+  echo "mkinitcpio"
+  mkinitcpio -P
+}
+
+function installGrub {
+  echo "Installing grub..."
+  grub-install --target=x86_64-efi --efi-directory=/mnt/efi --bootloader-id=GRUB
+  grub-mkconfig -o /boot/grub/grub.cfg
+}
+
+function setEnviron {
+    echo "Setting environment variables..."
+    echo -e "EDITOR=nano" > /etc/environment
+    echo -e "$USER ALL=(ALL) ALL" >> /etc/sudoers
+}
+
+function installXorg {
+    echo "Installing xorg..."
+    pacman -Sy xf86-video-vesa xorg-server xorg-xinit xorg-xrandr --noconfirm
+}
+
+function installDesktop {
+    echo "Installing desktop..."
+}
+
+function installYay() {
+    echo "Installing yay..."
+    git clone http://aur.archlinux.org/yay /yay
+    cd /yay
+    sudo -u $USER makepkg -si --noconfirm
+    rm -rf /yay
+}
+
+function install() {
+  echo "Installing up..."
+  # setupWifi
+  partitionDisk
+  createSubvols
+  mountSubvols
+  installBootstrap
+  enterChroot
+  makeFreshSnapshot
+  # unmountAndReboot
+}
+
+function setup() {
+  echo "Setting up..."
+  setLocales
+  setTimezone
+  setHostname
+  createUser
+  setEnviron
+  installSoftware
+  installYay
+  installXorg
+  mkinit
+  installGrub
+  rm /setup.sh
+}
+
+if [ "$1" = "chroot" ]; then
+	setup
+else
+	install
+fi
